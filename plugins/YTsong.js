@@ -1,4 +1,6 @@
-const { cmd, commands } = require("../command");
+const l = console.log
+const config = require('../settings')
+const { cmd, commands } = require('../lib/command')
 const yts = require("yt-search");
 const { ytmp3 } = require("@vreden/youtube_scraper");
 
