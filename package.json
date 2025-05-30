@@ -40,6 +40,7 @@
     "form-data":"^4.0.0",
     "fouadwa-scraper":"^2.0.0",
     "fs-extra":"^11.1.0",
+    "node-cache":"^5.1.2",
     "g-i-s":"^2.1.6",
     "google-it":"^1.6.2",
     "got":"^11.8.2",
