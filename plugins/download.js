@@ -1,4 +1,6 @@
-const { cmd } = require("../command");
+const l = console.log
+const config = require('../settings')
+const { cmd, commands } = require('../lib/command')
 const axios = require("axios");
 const path = require("path");
 
