@@ -42,6 +42,7 @@
     "fs-extra":"^11.1.0",
     "node-cache":"^5.1.2",
     "g-i-s":"^2.1.6",
+    "vreden/youtube_scraper":"^1.2.7",
     "google-it":"^1.6.2",
     "got":"^11.8.2",
     "heroku-client":"^3.1.0",
