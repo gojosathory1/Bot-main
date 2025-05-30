@@ -1,8 +1,10 @@
-const l = console.log
-const config = require('../settings')
-const { cmd, commands } = require('../lib/command')
+const l = console.log;
+const config = require('../settings');
+const { cmd, commands } = require('../lib/command');
 const yts = require("yt-search");
-const { ytmp3 } = require("@vreden/youtube_scraper");
+const ytdl = require("ytdl-core");
+const fs = require("fs");
+const path = require("path");
 
 cmd(
   {
@@ -44,12 +46,10 @@ cmd(
     try {
       if (!q) return reply("*නමක් හරි ලින්ක් එකක් හරි දෙන්න* 🌚❤️");
 
-      // Search for the video
       const search = await yts(q);
       const data = search.videos[0];
       const url = data.url;
 
-      // Song metadata description
       let desc = `
 *❤️GOJO SONG DOWNLOADER❤️*
 
@@ -63,51 +63,53 @@ cmd(
 𝐌𝐚𝐝𝐞 𝐛𝐲 𝐬𝐚𝐲𝐮𝐫𝐚
 `;
 
-      // Send metadata thumbnail message
       await robin.sendMessage(
         from,
         { image: { url: data.thumbnail }, caption: desc },
         { quoted: mek }
       );
 
-      // Download the audio using @vreden/youtube_scraper
-      const quality = "128"; // Default quality
-      const songData = await ytmp3(url, quality);
-
-      // Validate song duration (limit: 30 minutes)
-      let durationParts = data.timestamp.split(":").map(Number);
-      let totalSeconds =
+      const durationParts = data.timestamp.split(":").map(Number);
+      const totalSeconds =
         durationParts.length === 3
           ? durationParts[0] * 3600 + durationParts[1] * 60 + durationParts[2]
           : durationParts[0] * 60 + durationParts[1];
 
       if (totalSeconds > 1800) {
-        return reply("⏱️ audio limit is 120 minitues");
+        return reply("⏱️ audio limit is 30 minutes");
       }
 
-      // Send audio file
-      await robin.sendMessage(
-        from,
-        {
-          audio: { url: songData.download.url },
-          mimetype: "audio/mpeg",
-        },
-        { quoted: mek }
-      );
+      const filePath = path.join(__dirname, "../temp", `${Date.now()}.mp3`);
+      const audioStream = ytdl(url, { filter: 'audioonly', quality: 'highestaudio' });
 
-      // Send as a document (optional)
-      await robin.sendMessage(
-        from,
-        {
-          document: { url: songData.download.url },
-          mimetype: "audio/mpeg",
-          fileName: `${data.title}.mp3`,
-          caption: "𝐌𝐚𝐝𝐞 𝐛𝐲 𝐬𝐚𝐲𝐮𝐫𝐚",
-        },
-        { quoted: mek }
-      );
+      const writeStream = fs.createWriteStream(filePath);
+      audioStream.pipe(writeStream);
 
-      return reply("*Thanks for using my bot* 🌚❤️");
+      writeStream.on("finish", async () => {
+        await robin.sendMessage(
+          from,
+          {
+            audio: fs.readFileSync(filePath),
+            mimetype: "audio/mpeg",
+          },
+          { quoted: mek }
+        );
+
+        await robin.sendMessage(
+          from,
+          {
+            document: fs.readFileSync(filePath),
+            mimetype: "audio/mpeg",
+            fileName: `${data.title}.mp3`,
+            caption: "𝐌𝐚𝐝𝐞 𝐛𝐲 𝐬𝐚𝐲𝐮𝐫𝐚",
+          },
+          { quoted: mek }
+        );
+
+        fs.unlinkSync(filePath); // Delete file after sending
+        return reply("*Thanks for using my bot* 🌚❤️");
+      });
+
     } catch (e) {
       console.log(e);
       reply(`❌ Error: ${e.message}`);
