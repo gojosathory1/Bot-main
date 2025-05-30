@@ -1,4 +1,7 @@
-const config = require('../settings') const { cmd, commands } = require('../lib/command') const { getBuffer, fetchJson } = require('../lib/functions') const { sizeFormatter } = require('human-readable') const GDriveDl = require('../lib/gdrive.js'); // ✅ CORRECT const N_FOUND = "I couldn't find anything :("
+const l = console.log
+const config = require('../settings')
+const { cmd, commands } = require('../lib/command')
+const { getBuffer, fetchJson } = require('../lib/functions') const { sizeFormatter } = require('human-readable') const GDriveDl = require('../lib/gdrive.js'); // ✅ CORRECT const N_FOUND = "I couldn't find anything :("
 
 cmd({ pattern: "slanimeclub", react: '📑', category: "movie", desc: "slanimeclub movie downloader", filename: __filename }, async (conn, m, mek, { from, prefix, q, l, reply }) => { try { if (!q) return await reply('Please Give Me Text..! 🖊️')
 
