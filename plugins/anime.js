@@ -1,3 +1,8 @@
+const axios = require("axios");
+const fetchJson = require("../lib/fetchJson"); // or your fetchJson path
+const { GDriveDl } = require("../lib/gdrive"); // adjust path if needed
+const { getBuffer } = require("../lib/functions"); // adjust path if needed
+
 cmd({
     pattern: "slanimeclub",	
     react: '📑',
@@ -6,65 +11,68 @@ cmd({
     filename: __filename
 },
 async (conn, m, mek, { from, prefix, q, l, isDev, reply }) => {
-try{
+  try {
 
-        if (!q) return await reply('*Please Give Me Text..! 🖊️*')
-	
+    if (!q) return await reply('*Please Give Me Text..! 🖊️*')
 
-const data = await fetchJson(`https://vajira-movie-api.vercel.app/api/slanimeclub/search?q=${q}&apikey=vajiraofficial`)
+    const searchRes = await fetchJson(`https://vajira-movie-api.vercel.app/api/slanimeclub/search?q=${q}&apikey=vajiraofficial`)
+    const link = searchRes?.data?.data?.data?.[0]?.link
+    if (!link) return reply("❌ Movie not found.")
 
+    const movieRes = await fetchJson(`https://vajira-movie-api.vercel.app/api/slanimeclub/movie?url=${link}&apikey=vajiraofficial`)
+    const movieData = movieRes?.data?.data?.moviedata
+    if (!movieData) return reply("❌ Failed to fetch movie details.")
 
-
-	
-const link = data.data.data.data[0].link
-
-
-const data1 = await fetchJson(`https://vajira-movie-api.vercel.app/api/slanimeclub/movie?url=${link}&apikey=vajiraofficial`)
-
-const cap = `*_☘ Title: ${data1.data.data.moviedata.title}_*
-
-- *Date:* ${data1.data.data.moviedata.date}
-- *Generous* ${data2.data.data.moviedata.generous}
-
+    const caption = `*_☘ Title: ${movieData.title}_*\n
+- *Date:* ${movieData.date}
+- *Genre:* ${movieData.generous}
 *⛏️ Link:* ${q}`
 
-const link1 = data.data.data.moviedata.seasons[0].link
+    const imageUrl = movieData.image
+    const seasonLink = movieData.seasons?.[0]?.link
+    if (!seasonLink) return reply("⚠️ No season link found.")
 
+    await conn.sendMessage(from, {
+      image: { url: imageUrl },
+      caption: caption
+    }, { quoted: mek })
 
+    const downloadRes = await fetchJson(`https://vajira-movie-api.vercel.app/api/slanimeclub/download?url=${seasonLink}&apikey=vajiraofficial`)
+    const downloadUrl = downloadRes?.data?.data?.link
 
- await conn.sendMessage(from, { image: { url: data.data.data.moviedata.image} , caption: cap } , { quoted: mek })
- 
- 
-const data = await fetchJson(`https://vajira-movie-api.vercel.app/api/slanimeclub/download?url=${link1}&apikey=vajiraofficial`)
-        const dl_link = `${data.data.data.link}`
+    if (!downloadUrl) return reply("❌ Download link not available.")
 
+    if (downloadUrl.includes("https://slanimeclub.co")) {
+      const buffer = await getBuffer(downloadUrl)
+      await conn.sendMessage(from, {
+        document: buffer,
+        mimetype: "video/mp4",
+        fileName: `${movieData.title}.mp4`,
+        caption: "📥 *Downloaded from SLAnimeClub*"
+      }, { quoted: mek })
 
-if (dl_link.includes("https://slanimeclub.co")) {    
-	    
-    const message = {
-            document: await getBuffer(dl_link),
-	    caption: `pakaya`,
-            mimetype: "video/mp4",
-            fileName: `${data1.data.data.moviedata.title}.mp4`,
-        };	    
-        await conn.sendMessage(from, message );
+    } else if (downloadUrl.includes("https://drive.google.com")) {
+      const gdriveRes = await GDriveDl(downloadUrl)
+      let txt = `*[ Downloading file ]*\n\n`
+      txt += `*Name :* ${gdriveRes.fileName}\n`
+      txt += `*Size :* ${gdriveRes.fileSize}\n`
+      txt += `*Type :* ${gdriveRes.mimetype}`
 
-} if (dl_link.includes("https://drive.google.com")) {
+      await reply(txt)
 
+      await conn.sendMessage(from, {
+        document: { url: gdriveRes.downloadUrl },
+        mimetype: gdriveRes.mimetype,
+        fileName: gdriveRes.fileName,
+        caption: `${gdriveRes.fileName}\n\nDownloaded by 𝔾𝕆𝕁𝕆_𝕄𝔻 😈`
+      }, { quoted: mek })
+    } else {
+      reply("❌ Unsupported download link.")
+    }
 
-let res = await GDriveDl(dl_link)
-		let txt = `*[ Downloading file ]*\n\n`
-		txt += `*Name :* ${res.fileName}\n`
-		txt += `*Size :* ${res.fileSize}\n`
-		txt += `*Type :* ${res.mimetype}`	
-        await reply(txt)
-conn.sendMessage(from, { document: { url: res.downloadUrl }, caption: `${res.fileName}\n\n${config.FOOTER}`, fileName: res.fileName, mimetype: res.mimetype }, { quoted: mek })
-
-}
- 
- 
-} catch (e) {
-  reply('*ERROR !!*')
-  l(e)
-}
+  } catch (e) {
+    reply('*❌ ERROR occurred!*')
+    console.error("SLAnimeClub Error:", e)
+    l(e)
+  }
 })
