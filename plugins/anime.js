@@ -1,64 +1,68 @@
 const { cmd } = require('../lib/command');
-const { getBuffer, getThumbnailBuffer } = require('../lib/functions');
-const config = require('../settings');
+const { fetchHtml, getBuffer, getThumbnailBuffer } = require('../lib/functions');
 const cheerio = require('cheerio');
-const axios = require('axios');
+const config = require('../settings');
 
 cmd({
     pattern: "slanimeclub",
-    react: '📑',
+    react: '📥',
     category: "movie",
-    desc: "Download Sinhala subbed anime from slanimeclub.co",
+    desc: "Scrapes Sinhala Anime from slanimeclub.co",
     filename: __filename
 },
 async (conn, m, mek, { from, q, reply }) => {
     const lang = config.LANG === 'SI';
-    if (!q) return reply(lang ? '*කරුණාකර සෙවීමක් ලබා දෙන්න..! 🖊️*' : '*Please provide a search term..! 🖊️*');
-
     try {
-        // Search page
-        const searchURL = `https://slanimeclub.co/?s=${encodeURIComponent(q)}`;
-        const searchRes = await axios.get(searchURL);
-        const $ = cheerio.load(searchRes.data);
+        if (!q) return reply(lang ? '*කරුණාකර සෙවීමක් ලබා දෙන්න*' : '*Please provide a search term*');
 
-        const firstResult = $('.ml-mask').first();
-        if (!firstResult.length) {
-            return reply(lang ? "*ප්‍රතිඵලයක් හමු නොවුණි*" : "*No anime found with that name*");
-        }
+        const searchUrl = `https://slanimeclub.co/?s=${encodeURIComponent(q)}`;
+        const html = await fetchHtml(searchUrl);
+        const $ = cheerio.load(html);
+        const firstPost = $('.post-thumbnail a').first();
 
-        const animePage = firstResult.find('a').attr('href');
-        const title = firstResult.find('.mli-info h2').text().trim();
-        const image = firstResult.find('img').attr('src');
+        if (!firstPost.attr('href')) return reply(lang ? '*ප්‍රතිඵලයක් හමු නොවුණි*' : '*No results found*');
 
-        // Get episode link
-        const animeRes = await axios.get(animePage);
-        const $$ = cheerio.load(animeRes.data);
-        const epLink = $$('a[href*="slanimeclub.co/wp-content"]').first().attr('href');
+        const animeUrl = firstPost.attr('href');
+        const animeTitle = firstPost.attr('title');
+        const animeThumb = firstPost.find('img').attr('src');
 
-        if (!epLink) {
-            return reply(lang ? "*බාගත කිරීමේ සබැඳියක් හමු නොවුණි*" : "*No download link found*");
-        }
+        const animePage = await fetchHtml(animeUrl);
+        const $$ = cheerio.load(animePage);
+        const links = [];
 
-        // Send poster
+        $$('.su-button-center a, a[href*=".mp4"], a[href*="drive.google.com"]').each((i, el) => {
+            const url = $$(el).attr('href');
+            const text = $$(el).text().trim();
+            if (url) links.push({ url, text });
+        });
+
+        if (links.length === 0) return reply(lang ? '*බාගත කිරීම සදහා කිසිඳු ලින්ක් නොමැත*' : '*No download links found*');
+
+        // Send poster & caption
+        const caption = `🎞️ *${animeTitle}*\n\n📥 *Available Downloads:*\n\n` + links.map((v, i) => `${i + 1}. ${v.text || v.url}`).join('\n');
         await conn.sendMessage(from, {
-            image: { url: image },
-            caption: `🎞️ *${title}*\n\n🔗 ${animePage}`
+            image: { url: animeThumb },
+            caption
         }, { quoted: mek });
 
-        // Send mp4 file
-        await conn.sendMessage(from, {
-            document: { url: epLink },
-            caption: `${title}\n\n${config.FOOTER}`,
-            fileName: `${title}.mp4`,
-            mimetype: "video/mp4",
-            jpegThumbnail: await getThumbnailBuffer(config.LOGO)
-        }, { quoted: mek });
+        // Try to send the first MP4/Drive link
+        const firstLink = links.find(v => v.url.includes('.mp4') || v.url.includes('drive.google.com'));
+        if (!firstLink) return;
 
-        await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-        reply(lang ? '✅ චිත්‍රපටය සාර්ථකව යැවිය' : '✅ Anime sent successfully');
+        if (firstLink.url.includes('.mp4')) {
+            await conn.sendMessage(from, {
+                document: { url: firstLink.url },
+                mimetype: 'video/mp4',
+                caption: animeTitle,
+                fileName: `${animeTitle}.mp4`,
+                jpegThumbnail: await getThumbnailBuffer(config.LOGO)
+            }, { quoted: mek });
+        } else if (firstLink.url.includes('drive.google.com')) {
+            reply(`📎 *Google Drive Link*\n${firstLink.url}`);
+        }
 
-    } catch (err) {
-        console.error(err);
-        reply(lang ? '*දෝෂයක් සිදු විය*' : '*Something went wrong*');
+    } catch (e) {
+        console.error(e);
+        reply(lang ? '*දෝෂයක් සිදු විය. නැවත උත්සහ කරන්න.*' : '*An error occurred. Please try again.*');
     }
 });
