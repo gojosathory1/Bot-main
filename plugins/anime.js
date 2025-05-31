@@ -1,69 +1,62 @@
 const { cmd } = require('../lib/command');
 const { getBuffer, getThumbnailBuffer } = require('../lib/functions');
-const axios = require('axios');
 const cheerio = require('cheerio');
+const axios = require('axios');
 const config = require('../settings');
 
 cmd({
-    pattern: "anime",
-    react: '📑',
+    pattern: "slanimeclub",
+    react: '🎥',
     category: "movie",
-    desc: "Download Sinhala subbed anime from SlanimeClub",
+    desc: "Download Sinhala Subbed Anime from slanimeclub.co",
     filename: __filename
 },
 async (conn, m, mek, { from, q, reply }) => {
     const lang = config.LANG === 'SI';
+
     try {
-        if (!q) return reply(lang ? '*කරුණාකර සෙවීමක් ලබා දෙන්න..! 🖊️*' : '*Please provide a search term..! 🖊️*');
+        if (!q) return reply(lang ? '*කරුණාකර සෙවීමක් ලබා දෙන්න 🖊️*' : '*Please provide a search term 🖊️*');
 
-        await reply(lang ? '🔍 සෙවෙමින් සිටී...' : '🔍 Searching...');
+        const searchUrl = `https://slanimeclub.co/?s=${encodeURIComponent(q)}`;
+        const { data: searchHtml } = await axios.get(searchUrl);
+        const $ = cheerio.load(searchHtml);
 
-        // Fetch homepage and filter
-        const baseURL = "https://slanimeclub.co";
-        const { data: html } = await axios.get(baseURL);
-        const $ = cheerio.load(html);
+        const firstResult = $('.result-item').first();
+        if (!firstResult || !firstResult.find('a').attr('href')) {
+            return reply(lang ? '*ඇනීමේ නමකට අනූව කිසිවක් හමු නොවුණි*' : '*No anime found with that name*');
+        }
 
-        let found = null;
-        $('.result-item').each((i, el) => {
-            const title = $(el).find('.post-title a').text().trim();
-            if (title.toLowerCase().includes(q.toLowerCase())) {
-                found = {
-                    title,
-                    link: $(el).find('.post-title a').attr('href'),
-                    image: $(el).find('img').attr('src')
-                };
-                return false;
-            }
-        });
+        const animePageUrl = firstResult.find('a').attr('href');
+        const animeImage = firstResult.find('img').attr('src');
+        const animeTitle = firstResult.find('.title').text().trim();
 
-        if (!found) return reply(lang ? "*ප්‍රතිඵලයක් හමු නොවුණි*" : "*No anime found with that name*");
+        const { data: animePageHtml } = await axios.get(animePageUrl);
+        const $$ = cheerio.load(animePageHtml);
 
-        const { data: page } = await axios.get(found.link);
-        const $$ = cheerio.load(page);
-        const downloadBtn = $$('a.wp-block-button__link[href*="https://"]').first().attr('href');
+        const videoLink = $$('.mirror-button a[href$=".mp4"]').first().attr('href');
+        if (!videoLink) return reply(lang ? '*🎞️ Video link එක සොයාගත නොහැක*' : '*🎞️ Unable to find video link*');
 
-        if (!downloadBtn) return reply(lang ? '*බාගත කිරීමේ ලින්ක් එක හමු නොවුණි*' : '*Download link not found*');
+        const caption = lang
+            ? `🎞️ *මාතෘකාව:* ${animeTitle}\n\n*⏩ MP4 වීඩියෝව යවමින්...*`
+            : `🎞️ *Title:* ${animeTitle}\n\n*⏩ Sending MP4 video...*`;
 
         await conn.sendMessage(from, {
-            image: { url: found.image },
-            caption: lang
-                ? `*_☘ මාතෘකාව: ${found.title}_*\n\n*බාගත කිරීමේ ලින්ක් එක සොයාගෙන ඇත. උඩුගත වෙමින්...*`
-                : `*_☘ Title: ${found.title}_*\n\n*Download link found. Uploading...*`
+            image: { url: animeImage },
+            caption
         }, { quoted: mek });
 
         await conn.sendMessage(from, {
-            document: { url: downloadBtn },
-            mimetype: "video/mp4",
-            fileName: `${found.title}.mp4`,
-            caption: `${found.title}\n\n${config.FOOTER}`,
+            document: await getBuffer(videoLink),
+            fileName: `${animeTitle}.mp4`,
+            mimetype: 'video/mp4',
+            caption: animeTitle,
             jpegThumbnail: await getThumbnailBuffer(config.LOGO)
         }, { quoted: mek });
 
         await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
-        reply(lang ? '✅ ඔබගේ චිත්‍රපටය උඩුගත විය' : '✅ Your anime was uploaded successfully');
 
-    } catch (e) {
-        console.error(e);
-        reply(lang ? '*දෝෂයක් සිදු විය.. නැවත උත්සහ කරන්න*' : '*Something went wrong.. please try again*');
+    } catch (err) {
+        console.error(err);
+        reply(lang ? '*දෝෂයක් සිදු විය. කරුණාකර නැවත උත්සාහ කරන්න.*' : '*An error occurred. Please try again.*');
     }
 });
