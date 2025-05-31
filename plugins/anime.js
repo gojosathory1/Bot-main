@@ -3,7 +3,7 @@ const config = require('../settings')
 const { cmd, commands } = require('../lib/command')
 const axios = require("axios");
 
-const { fetchJson } = require('../lib/myfunc');
+const { fetchJson } = require('../lib/function');
 const { GDriveDl } = require('../lib/gdrive');
 
   // ✅ Import Required Functions
