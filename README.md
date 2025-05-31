@@ -8,7 +8,7 @@ l
 </p>
 <p align="center">
 <a href="https://github.com/VajiraTech">
-    <img src="[![file-00000000d0dc61f597f450261ecfe33f.png](https://i.postimg.cc/Gm52Dg04/file-00000000d0dc61f597f450261ecfe33f.png)](https://postimg.cc/TKnfM93x)"  width="700px">
+    <img src="https://postimg.cc/TKnfM93x"  width="700px">
 </a>
 <hr>
 
